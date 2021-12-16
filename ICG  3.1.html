@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>3.1 ICG</title>
+	<script type="text/javascript" async
+		src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML" async>
+	</script>
+	<style>
+	body{
+		background-color: gold;
+	}
+	</style>
+</head>
+<body>
+	<div align="center">
+	<h1>Manipulação de histogramas em imagens</h1>
+	
+	<h2>😻 Eis o gatinho que sofrerá mutação! 😻</h2>
+
+	<figure>
+	<canvas id="imagemOriginal" width="2000" height="450"></canvas>
+	</figure>
+
+	<h1>Histogramas de RGB e luminância</h1>
+	<h2>Ao lado do nosso gatinho estão os histogramas de vermelho, verde e azul (graduados de 0 a 255) e o histograma de luminância (graduado de 0 a 100).</h2>
+	<canvas id="imagemOutput" width="2000" height="450"></canvas>
+
+	<h1>Modificação de luminância</h1>
+	<h2>Agora vemos o gatinho com luminância alterada e um novo histograma, a mutação está feita! 😈</h2>
+	<canvas id="imagemOutput2" width="2000" height="450"></canvas>
+
+	<div>
+		<p id="p1" >
+		<p id="p2" >
+		<p id="p3" >
+	</div>
+	<div>
+		<p id="p4" >
+		<p id="p5" >
+		<p id="p6" >
+	</div>
+	<div>
+		<p id="p7" >
+		<p id="p8" >
+		<p id="p9" >
+	</div>
+
+<script>
+
+	// Contador de ocorrências
+    const countOccurrences = (arr, val) => arr.reduce((a, v) => (v === val ? a + 1 : a), 0);
+
+	// Conversor RGB -> HSL
+	function rgb2hsl(r, g, b){
+    r /= 255, g /= 255, b /= 255;
+    var max = Math.max(r, g, b), min = Math.min(r, g, b);
+    var h, s, l = (max + min) / 2;
+
+    if(max == min){
+        h = s = 0; 
+    }else{
+        var d = max - min;
+        s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+        switch(max){
+            case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+            case g: h = (b - r) / d + 2; break;
+            case b: h = (r - g) / d + 4; break;
+        }
+        h /= 6;
+    }
+
+    return [h*360, s, l];
+}
+
+	// Conversor HSL -> RGB
+		function hsl2rgb(h, s, l){
+			var r, g, b;
+		
+			if(s == 0){
+				r = g = b = l; 
+			}else{
+				var hue2rgb = function hue2rgb(p, q, t){
+					if(t < 0) t += 1;
+					if(t > 1) t -= 1;
+					if(t < 1/6) return p + (q - p) * 6 * t;
+					if(t < 1/2) return q;
+					if(t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+					return p;
+				}
+		
+				var q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+				var p = 2 * l - q;
+				r = hue2rgb(p, q, h + 1/3);
+				g = hue2rgb(p, q, h);
+				b = hue2rgb(p, q, h - 1/3);
+			}
+		
+			return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
+		}
+
+	function NaNTo0(value){
+		if (isNaN(value)){
+			value = 0
+		}
+		return value
+	}
+
+	dot = (a, b) => a.map((x, i) => a[i] * b[i]).reduce((m, n) => m + n);
+
+	var canvasOriginal = document.getElementById("imagemOriginal");
+	var ctxOriginal = canvasOriginal.getContext("2d");
+	
+	var canvasOut = document.getElementById("imagemOutput");
+	var ctxOutput = canvasOut.getContext("2d");
+
+	var canvasOut2 = document.getElementById("imagemOutput2");
+	var ctxOutput2 = canvasOut2.getContext("2d");
+
+	var imgOriginal = new Image();
+	var imgDataOut = new Image();
+    var imgDataOut2 = new Image();
+
+	var peso0 = []
+		for (let n = 1; n < 10; n++) { 
+			peso0.push(document.getElementById("p"+n).value)
+		}
+	
+	// Link da imagem
+	var imgUrl = "https://upload.wikimedia.org/wikipedia/commons/thumb/e/ee/Domestic_cat_felis_catus.jpg/640px-Domestic_cat_felis_catus.jpg";
+
+	imgOriginal.crossOrigin = '';
+	imgDataOut.crossOrigin = '';
+	imgDataOut2.crossOrigin = '';
+    imgOriginal.src = imgUrl;
+
+	imgOriginal.onload = function(){
+		ctxOriginal.drawImage(imgOriginal, 0, 0);
+		ctxOutput.drawImage(imgOriginal, 0, 0);
+		ctxOutput2.drawImage(imgOriginal, 0, 0);
+		
+		imgDataOut = ctxOriginal.getImageData(0, 0, 640, 430);
+		
+		// Matrizes que formam o RGB
+		const red = [];
+		const green = [];
+		const blue = [];
+		const rgb = []
+		for (let i = 0; i < imgDataOut.data.length; i += 4) {
+		    red.push(imgDataOut.data[i])
+			green.push(imgDataOut.data[i+1])
+			blue.push(imgDataOut.data[i+2])
+			rgb.push([imgDataOut.data[i],imgDataOut.data[i+1],imgDataOut.data[i+2]])
+		}
+
+		ctxOutput.putImageData(imgDataOut, 0, 0);	
+		
+		// Histogramas RGB
+		for (var j = 0; j < 255; j++){
+			ctxOutput.beginPath();
+			ctxOutput.moveTo(700 + j, 160);
+			ctxOutput.lineTo(700 + j, 160 - countOccurrences(red, j)/20);
+			ctxOutput.strokeStyle = "red";
+			ctxOutput.stroke();
+
+			ctxOutput.beginPath();
+			ctxOutput.moveTo(1000 + j, 160);
+			ctxOutput.lineTo(1000 + j, 160 - countOccurrences(green, j)/20);
+			ctxOutput.strokeStyle = "green";
+			ctxOutput.stroke();
+
+			ctxOutput.beginPath();
+			ctxOutput.moveTo(700 + j, 350);
+			ctxOutput.lineTo(700 + j, 350 - countOccurrences(blue, j)/20);
+			ctxOutput.strokeStyle = "blue";
+			ctxOutput.stroke();
+		}	
+
+		hsl = []
+		lum = []
+
+		// Matrizes HSL
+		for (let i = 0; i < rgb.length; i += 1) {
+			hsl.push(rgb2hsl(rgb[i][0],rgb[i][1],rgb[i][2]));
+			lum.push(hsl[i][2])
+		}
+
+		lum2 = lum.map(function(each_element){
+    return Number(Math.floor((255*each_element).toFixed(2)));
+});
+
+        // Histograma de luminância
+		for (var k = 0; k < 100; k++){
+			ctxOutput.beginPath();
+			ctxOutput.moveTo(1000 + k, 350);
+			ctxOutput.lineTo(1000 + k, (350 - countOccurrences(lum2, k)/20));
+			ctxOutput.strokeStyle = "gray";
+			ctxOutput.stroke();
+		}	
+
+		// Nova matriz HSL
+		const arrAvg = arr => arr.reduce((a,b) => a + b, 0) / arr.length
+		media_lum = arrAvg(lum)
+        var pesolum = 0.4
+		for (let i = 0; i < lum.length; i += 1) {
+			lum[i] = media_lum + (lum[i] - media_lum) * pesolum
+			hsl[i][2] = lum[i]
+		}
+
+    // Novo conversor HSL -> RGB
+	for (let i = 0; i < rgb.length; i += 1) {
+				rgb[i] = (hsl2rgb(hsl[i][0]/360,hsl[i][1],hsl[i][2]));
+	} 
+			
+	imgDataOut2 = ctxOriginal.getImageData(0, 0, 640, 430);
+
+	// Nova imagem
+	for (let i = 0; i < imgDataOut2.data.length; i += 4) {
+		imgDataOut2.data[i] = rgb[i/4][0];
+		imgDataOut2.data[i+1] = rgb[i/4][1];
+		imgDataOut2.data[i+2] = rgb[i/4][2];
+	}
+	ctxOutput2.putImageData(imgDataOut2, 0, 0);
+
+	lum2 = lum.map(function(each_element){
+    return Number(Math.floor((255*each_element).toFixed(2)));
+});
+    // Novo histograma de luminância
+		for (var k = 0; k < 255; k++){
+			ctxOutput2.beginPath();
+			ctxOutput2.moveTo(900 + k, 350);
+			ctxOutput2.lineTo(900 + k, (350 - countOccurrences(lum2, k)/20));
+			ctxOutput2.strokeStyle = "gray";
+			ctxOutput2.stroke();
+		}	
+};	    
+
+</script>
+	</div>
+</body>
+</html>
